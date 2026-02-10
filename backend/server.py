@@ -214,7 +214,7 @@ def parse_property_value(value_str: str) -> Optional[float]:
 async def root():
     return {"message": "Property Value Tracker API"}
 
-@api_router.post("/properties", response_model=PropertyResponse)
+@api_router.post("/properties", response_model=PropertyResponse, status_code=201)
 async def create_property(input: PropertyCreate):
     """Add a new property to track"""
     # Validate URL
