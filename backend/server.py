@@ -200,12 +200,12 @@ def parse_property_value(value_str: str) -> Optional[float]:
         clean = re.sub(r'[a-zA-Z]', '', clean)
         try:
             return float(clean) * 1000000
-        except:
+        except ValueError:
             return None
     
     try:
         return float(clean)
-    except:
+    except ValueError:
         return None
 
 # ============ API ROUTES ============
