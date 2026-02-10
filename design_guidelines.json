@@ -1,0 +1,140 @@
+{
+  "project_name": "PropertyValueTracker",
+  "design_identity": {
+    "persona": "E1 - The Anti-AI Designer",
+    "tone": "Trust, Growth, Clarity, Organic Premium",
+    "archetype": "Organic & Earthy (Refined for Fintech)",
+    "theme_mode": "light"
+  },
+  "typography": {
+    "fonts": [
+      {
+        "family": "Libre Baskerville",
+        "url": "https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap",
+        "usage": "Headings (h1, h2, h3), Big Numbers"
+      },
+      {
+        "family": "Public Sans",
+        "url": "https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700&display=swap",
+        "usage": "Body, UI elements, Data, Charts"
+      }
+    ],
+    "rules": {
+      "headings": "font-serif font-bold tracking-tight text-primary",
+      "body": "font-sans text-base leading-relaxed text-foreground/80",
+      "labels": "font-sans text-xs uppercase tracking-widest text-muted-foreground",
+      "numbers": "font-serif text-3xl md:text-4xl font-normal text-foreground"
+    }
+  },
+  "colors": {
+    "palette": {
+      "background": "#FDFCF8",
+      "foreground": "#1A1C19",
+      "card": "#FFFFFF",
+      "card-foreground": "#1A1C19",
+      "primary": "#2E4F41",
+      "primary-foreground": "#FFFFFF",
+      "secondary": "#E8E6D9",
+      "secondary-foreground": "#2E4F41",
+      "accent": "#D4A373",
+      "accent-foreground": "#FFFFFF",
+      "muted": "#F2F0E9",
+      "muted-foreground": "#6B706B",
+      "border": "#E2E0D6",
+      "input": "#E2E0D6",
+      "ring": "#2E4F41",
+      "chart": {
+        "1": "#2E4F41",
+        "2": "#D4A373",
+        "3": "#8B9D8B",
+        "4": "#C47F65",
+        "5": "#E8E6D9"
+      }
+    },
+    "gradients": {
+      "subtle": "linear-gradient(to bottom right, #FDFCF8, #F2F0E9)",
+      "glow": "radial-gradient(circle at 50% 50%, rgba(212, 163, 115, 0.15), transparent 70%)"
+    }
+  },
+  "layout_strategy": {
+    "type": "Bento Grid Mode B (High Density)",
+    "container": "max-w-[1600px] mx-auto p-6 md:p-12",
+    "spacing": {
+      "section_gap": "gap-12",
+      "item_gap": "gap-6",
+      "internal_padding": "p-6 md:p-8"
+    },
+    "grid_config": "grid grid-cols-1 md:grid-cols-12 gap-6"
+  },
+  "components": {
+    "PropertyCard": {
+      "style": "bg-card border border-border rounded-xl shadow-[0_2px_12px_-4px_rgba(0,0,0,0.05)] hover:shadow-[0_8px_24px_-8px_rgba(46,79,65,0.12)] transition-all duration-300 group overflow-hidden",
+      "image_style": "aspect-[4/3] object-cover w-full group-hover:scale-105 transition-transform duration-500",
+      "content_padding": "p-6"
+    },
+    "StatCard": {
+      "style": "bg-secondary/30 border border-border/50 rounded-lg p-6 flex flex-col justify-between"
+    },
+    "Button": {
+      "primary": "bg-primary text-primary-foreground hover:bg-primary/90 rounded-full px-8 py-6 text-sm font-medium tracking-wide shadow-lg shadow-primary/20",
+      "outline": "border-2 border-primary/20 text-primary hover:bg-primary/5 rounded-full px-8 py-6"
+    },
+    "Chart": {
+      "style": "h-[300px] w-full",
+      "colors": ["#2E4F41", "#D4A373"]
+    }
+  },
+  "visual_enhancers": {
+    "texture": "Use a subtle noise texture (opacity 0.02) on the main background to reduce digital flatness.",
+    "shadows": "layered: shadow-sm for borders, shadow-lg for hovering cards",
+    "borders": "1px solid #E2E0D6 (Warm Grey)",
+    "motion": {
+      "hover": "scale-[1.01] -translate-y-1",
+      "transition": "all 0.4s cubic-bezier(0.22, 1, 0.36, 1)"
+    }
+  },
+  "image_assets": {
+    "dashboard_hero": "https://images.unsplash.com/photo-1737622088520-895463a1a06f?crop=entropy&cs=srgb&fm=jpg&q=85",
+    "property_placeholders": [
+      {
+        "url": "https://images.unsplash.com/photo-1758548157747-285c7012db5b?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "alt": "Modern living room interior"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1757439402190-99b73ac8e807?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "alt": "Bright kitchen space"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1758548157275-d939cf0f0e32?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "alt": "Detailed kitchen corner"
+      }
+    ]
+  },
+  "instructions_to_main_agent": [
+    "1. SETUP: Install fonts 'Libre Baskerville' and 'Public Sans' via Google Fonts link in index.html or import in CSS.",
+    "2. TAILWIND: Update tailwind.config.js with the precise color palette provided. Do not rely on default slate/gray.",
+    "3. LAYOUT: Implement the Dashboard using the Bento Grid Mode B strategy. The 'Add Property' section should be a distinct module, not a modal.",
+    "4. CHARTS: Use Recharts. Style the tooltip to match the 'Clean Clay' aesthetic (white bg, shadow, no border).",
+    "5. INTERACTION: Ensure every card has the hover state defined in visual_enhancers. Use Sonner for notifications.",
+    "6. DATA-TESTID: Add data-testid to all inputs (url-input), buttons (add-property-btn), and cards (property-card-{id}).",
+    "7. UNIVERSAL RULES: Follow the E1 design principles: generous spacing, no generic gradients, and meaningful contrast."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "- You tend to converge toward generic, 'on distribution' outputs. In frontend design, this creates what users call the 'AI slop' aesthetic. Avoid this: make creative, distinctive frontends that surprise and delight.",
+    "- Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients",
+    "- Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "- Create depth through layered design elements with z-index hierarchy",
+    "- Use glass-morphism effects with backdrop filters (12-24px blur)",
+    "- You MUST NOT apply universal transition. Eg: 'transition: all'. This results in breaking transforms. Always add transitions for specific interactive elements like button, input excluding transforms",
+    "- You MUST NOT center align the app container, ie do not add '.App { text-align: center; }' in the css file. This disrupts the human natural reading flow of text",
+    "- Always use modern button styles like pill-shaped, or sharp button with interaction animations & color relevant to the app style",
+    "- NEVER: use AI assistant Emoji characters like 🤖🧠 etc for icons.",
+    "- Every interaction needs micro-animations - hover states, transitions, parallax effects, and entrance animations. Static = dead.",
+    "- Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "- Subtle grain textures, noise overlays, custom cursors, selection states, and loading animations: separates good from extraordinary.",
+    "- Main agent relies on these image URLs. Missing categories (especially sponsor logos) = main agent will use placeholder text which is FORBIDDEN",
+    "- Prioritize using pre-existing components from src/components/ui when applicable",
+    "- Components MUST use named exports (export const ComponentName = ...)",
+    "- Use 'sonner' for toasts"
+  ]
+}
