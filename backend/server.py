@@ -358,6 +358,44 @@ async def refresh_property(property_id: str):
     updated = await db.properties.find_one({"id": property_id}, {"_id": 0})
     return PropertyResponse(**updated)
 
+class PropertyValueUpdate(BaseModel):
+    current_value: float
+
+@api_router.patch("/properties/{property_id}/value")
+async def update_property_value(property_id: str, input: PropertyValueUpdate):
+    """Manually update a property's value"""
+    property = await db.properties.find_one({"id": property_id}, {"_id": 0})
+    if not property:
+        raise HTTPException(status_code=404, detail="Property not found")
+    
+    old_value = property.get("current_value")
+    new_value = input.current_value
+    
+    update_data = {
+        "current_value": new_value,
+        "previous_value": old_value,
+        "status": "active",
+        "last_updated": datetime.now(timezone.utc).isoformat()
+    }
+    
+    if old_value and old_value > 0:
+        update_data["daily_change"] = new_value - old_value
+        update_data["daily_change_percent"] = round(((new_value - old_value) / old_value) * 100, 2)
+    
+    await db.properties.update_one({"id": property_id}, {"$set": update_data})
+    
+    # Record history
+    history = PropertyHistory(
+        property_id=property_id,
+        value=new_value
+    )
+    history_doc = history.model_dump()
+    history_doc['recorded_at'] = history_doc['recorded_at'].isoformat()
+    await db.property_history.insert_one(history_doc)
+    
+    updated = await db.properties.find_one({"id": property_id}, {"_id": 0})
+    return PropertyResponse(**updated)
+
 @api_router.get("/stats")
 async def get_stats():
     """Get dashboard statistics"""
