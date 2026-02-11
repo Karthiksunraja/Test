@@ -500,15 +500,12 @@ async def get_portfolio_stats():
 
 @api_router.get("/portfolio/history")
 async def get_portfolio_history(days: int = 90):
-    """Get historical portfolio values for charting"""
+    """Get historical portfolio values for charting (ALL properties)"""
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     
-    # Get all investment property IDs
-    investment_props = await db.properties.find(
-        {"property_type": "investment"}, 
-        {"id": 1, "_id": 0}
-    ).to_list(1000)
-    prop_ids = [p["id"] for p in investment_props]
+    # Get ALL property IDs (Investment + PPOR)
+    all_props = await db.properties.find({}, {"id": 1, "_id": 0}).to_list(1000)
+    prop_ids = [p["id"] for p in all_props]
     
     if not prop_ids:
         return []
