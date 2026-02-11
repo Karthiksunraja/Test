@@ -179,11 +179,12 @@ export const PortfolioDashboard = () => {
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="mt-6">
-          {/* Portfolio Stats - Investment Properties Only */}
+          {/* Portfolio Stats - ALL Properties for Value, Investment Only for Cash Flow */}
           <div className="mb-8">
             <h2 className="text-xl font-serif font-semibold mb-4 flex items-center gap-2">
               <BarChart3 className="w-5 h-5 text-primary" />
-              Investment Portfolio Summary
+              Portfolio Summary
+              <span className="text-xs font-normal text-muted-foreground ml-2">(All Properties)</span>
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" data-testid="portfolio-stats">
               <Card className="stat-card">
