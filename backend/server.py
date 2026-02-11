@@ -101,51 +101,107 @@ class HistoryResponse(BaseModel):
 
 # ============ SCRAPING ============
 
+def parse_address_from_url(url: str) -> dict:
+    """Parse property address from URL patterns"""
+    data = {
+        "address": "",
+        "suburb": None,
+        "state": None,
+        "postcode": None
+    }
+    
+    # New format: /state/suburb-postcode/street/number-pid-xxxxx/
+    # Example: /nsw/marsden-park-2765/pratia-cres/46-pid-20583686/
+    new_format = re.search(r'/([a-z]{2,3})/([a-z-]+)-(\d{4})/([a-z-]+)/(\d+[a-z]?)-pid-', url.lower())
+    if new_format:
+        state = new_format.group(1).upper()
+        suburb = new_format.group(2).replace('-', ' ').title()
+        postcode = new_format.group(3)
+        street = new_format.group(4).replace('-', ' ').title()
+        number = new_format.group(5)
+        
+        data["address"] = f"{number} {street}, {suburb} {state} {postcode}"
+        data["suburb"] = suburb
+        data["state"] = state
+        data["postcode"] = postcode
+        return data
+    
+    # Old format: /property/123-street-name-suburb-state-postcode/
+    old_format = re.search(r'/property/([^/]+)', url)
+    if old_format:
+        address_slug = old_format.group(1)
+        address_parts = address_slug.replace('-', ' ').title()
+        data["address"] = address_parts
+        
+        # Try to extract location from end of URL
+        location_match = re.search(r'(\w+)-(\w{2,3})-(\d{4})$', url.rstrip('/'))
+        if location_match:
+            data["suburb"] = location_match.group(1).title()
+            data["state"] = location_match.group(2).upper()
+            data["postcode"] = location_match.group(3)
+    
+    return data
+
 async def scrape_property_data(url: str) -> dict:
     """Scrape property data from property.com.au"""
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Connection': 'keep-alive',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-AU,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Sec-Ch-Ua': '"Chromium";v="122", "Google Chrome";v="122"',
+        'Sec-Ch-Ua-Mobile': '?0',
+        'Sec-Ch-Ua-Platform': '"macOS"',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
+        'Upgrade-Insecure-Requests': '1',
     }
     
+    # First, parse what we can from the URL
+    data = {
+        "address": "",
+        "current_value": None,
+        "image_url": None,
+        "bedrooms": None,
+        "bathrooms": None,
+        "parking": None,
+        "property_type": None,
+        "suburb": None,
+        "state": None,
+        "postcode": None
+    }
+    
+    # Extract address from URL (this always works)
+    url_data = parse_address_from_url(url)
+    data.update(url_data)
+    
+    # Try to scrape additional data
     try:
         async with aiohttp.ClientSession() as session:
+            await asyncio.sleep(1)  # Rate limiting delay
             async with session.get(url, headers=headers, timeout=30) as response:
+                if response.status == 429:
+                    logger.warning(f"Rate limited for {url}")
+                    # Return URL-parsed data instead of error
+                    return data
+                    
                 if response.status != 200:
                     logger.warning(f"Failed to fetch {url}: Status {response.status}")
-                    return {"error": f"HTTP {response.status}"}
+                    return data  # Return URL-parsed data
                 
                 html = await response.text()
                 soup = BeautifulSoup(html, 'html.parser')
                 
-                data = {
-                    "address": "",
-                    "current_value": None,
-                    "image_url": None,
-                    "bedrooms": None,
-                    "bathrooms": None,
-                    "parking": None,
-                    "property_type": None,
-                    "suburb": None,
-                    "state": None,
-                    "postcode": None
-                }
-                
-                # Try to extract address from URL or page
-                # property.com.au URL format: /property/123-street-name-suburb-state-postcode/
-                url_match = re.search(r'/property/([^/]+)', url)
-                if url_match:
-                    address_slug = url_match.group(1)
-                    # Convert slug to readable address
-                    address_parts = address_slug.replace('-', ' ').title()
-                    data["address"] = address_parts
-                
                 # Try to extract from meta tags
                 og_title = soup.find('meta', property='og:title')
                 if og_title and og_title.get('content'):
-                    data["address"] = og_title['content'].split('|')[0].strip()
+                    title_content = og_title['content'].split('|')[0].strip()
+                    if title_content:
+                        data["address"] = title_content
                 
                 # Try to extract image
                 og_image = soup.find('meta', property='og:image')
@@ -153,13 +209,11 @@ async def scrape_property_data(url: str) -> dict:
                     data["image_url"] = og_image['content']
                 
                 # Try to find property value estimate
-                # Look for common value patterns
                 value_patterns = [
                     r'\$[\d,]+(?:\.\d{2})?',
                     r'[\d,]+(?:\.\d{2})?\s*(?:million|m)',
                 ]
                 
-                # Search in specific elements that might contain value
                 for script in soup.find_all('script'):
                     text = script.string or ""
                     for pattern in value_patterns:
@@ -167,16 +221,9 @@ async def scrape_property_data(url: str) -> dict:
                         if match:
                             value_str = match.group()
                             value = parse_property_value(value_str)
-                            if value and value > 100000:  # Reasonable property value
+                            if value and value > 100000:
                                 data["current_value"] = value
                                 break
-                
-                # Extract suburb/state from URL
-                location_match = re.search(r'(\w+)-(\w{2,3})-(\d{4})$', url.rstrip('/'))
-                if location_match:
-                    data["suburb"] = location_match.group(1).title()
-                    data["state"] = location_match.group(2).upper()
-                    data["postcode"] = location_match.group(3)
                 
                 return data
                 
