@@ -229,10 +229,10 @@ async def scrape_property_data(url: str) -> dict:
                 
     except asyncio.TimeoutError:
         logger.error(f"Timeout scraping {url}")
-        return {"error": "Timeout"}
+        return data  # Return URL-parsed data even on timeout
     except Exception as e:
         logger.error(f"Error scraping {url}: {str(e)}")
-        return {"error": str(e)}
+        return data  # Return URL-parsed data even on error
 
 def parse_property_value(value_str: str) -> Optional[float]:
     """Parse property value string to float"""
