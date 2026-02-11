@@ -152,10 +152,6 @@ class PropertyResponse(BaseModel):
     status: str = "active"
     last_updated: str
     created_at: str
-    postcode: Optional[str]
-    status: str
-    last_updated: str
-    created_at: str
 
 class HistoryResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
