@@ -372,6 +372,16 @@ export const Dashboard = () => {
               property={property}
               onDelete={handleDelete}
               onRefresh={handleRefresh}
+              onUpdateValue={async (id, value) => {
+                try {
+                  await axios.patch(`${API}/properties/${id}/value`, { current_value: value });
+                  toast.success("Property value updated!");
+                  fetchProperties();
+                  fetchStats();
+                } catch (error) {
+                  toast.error("Failed to update value");
+                }
+              }}
               formatCurrency={formatCurrency}
               formatChange={formatChange}
               style={{ animationDelay: `${index * 0.1}s` }}
@@ -383,7 +393,9 @@ export const Dashboard = () => {
   );
 };
 
-const PropertyCard = ({ property, onDelete, onRefresh, formatCurrency, formatChange, style }) => {
+const PropertyCard = ({ property, onDelete, onRefresh, onUpdateValue, formatCurrency, formatChange, style }) => {
+  const [editValue, setEditValue] = useState("");
+  const [isEditOpen, setIsEditOpen] = useState(false);
   const change = formatChange(property.daily_change, property.daily_change_percent);
   const ChangeIcon = change.icon;
 
@@ -394,6 +406,15 @@ const PropertyCard = ({ property, onDelete, onRefresh, formatCurrency, formatCha
   ];
 
   const imageUrl = property.image_url || placeholderImages[Math.abs(property.id.charCodeAt(0)) % 3];
+
+  const handleSaveValue = () => {
+    const numValue = parseFloat(editValue.replace(/[^0-9.]/g, ''));
+    if (numValue && numValue > 0) {
+      onUpdateValue(property.id, numValue);
+      setIsEditOpen(false);
+      setEditValue("");
+    }
+  };
 
   return (
     <Card 
