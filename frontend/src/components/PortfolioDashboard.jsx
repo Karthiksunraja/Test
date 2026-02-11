@@ -288,7 +288,7 @@ export const PortfolioDashboard = () => {
           {portfolioHistory.length > 0 && (
             <Card className="mb-8">
               <CardHeader>
-                <CardTitle className="font-serif">Portfolio Value Trend (Investment Properties)</CardTitle>
+                <CardTitle className="font-serif">Portfolio Value Trend (All Properties)</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="h-[350px]" data-testid="portfolio-chart">
