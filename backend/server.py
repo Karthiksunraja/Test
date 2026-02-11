@@ -123,31 +123,35 @@ class PropertyHistory(BaseModel):
 class PropertyResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str
-    url: Optional[str]
-    address: str
-    nickname: Optional[str]
-    property_type: str
-    current_value: Optional[float]
-    previous_value: Optional[float]
-    daily_change: Optional[float]
-    daily_change_percent: Optional[float]
-    outstanding_loan: Optional[float]
-    monthly_loan_repayment: Optional[float]
-    rent_amount: Optional[float]
-    rent_frequency: str
-    monthly_rent: Optional[float]
-    yearly_expenses: Optional[float]
-    net_value: Optional[float]
-    annual_rental_income: Optional[float]
-    annual_loan_repayments: Optional[float]
-    yearly_cash_flow: Optional[float]
-    yearly_shortage: Optional[float]
-    image_url: Optional[str]
-    bedrooms: Optional[int]
-    bathrooms: Optional[int]
-    parking: Optional[int]
-    suburb: Optional[str]
-    state: Optional[str]
+    url: Optional[str] = None
+    address: str = ""
+    nickname: Optional[str] = None
+    property_type: str = "investment"
+    current_value: Optional[float] = None
+    previous_value: Optional[float] = None
+    daily_change: Optional[float] = None
+    daily_change_percent: Optional[float] = None
+    outstanding_loan: Optional[float] = None
+    monthly_loan_repayment: Optional[float] = None
+    rent_amount: Optional[float] = None
+    rent_frequency: str = "monthly"
+    monthly_rent: Optional[float] = None
+    yearly_expenses: Optional[float] = None
+    net_value: Optional[float] = None
+    annual_rental_income: Optional[float] = None
+    annual_loan_repayments: Optional[float] = None
+    yearly_cash_flow: Optional[float] = None
+    yearly_shortage: Optional[float] = None
+    image_url: Optional[str] = None
+    bedrooms: Optional[int] = None
+    bathrooms: Optional[int] = None
+    parking: Optional[int] = None
+    suburb: Optional[str] = None
+    state: Optional[str] = None
+    postcode: Optional[str] = None
+    status: str = "active"
+    last_updated: str
+    created_at: str
     postcode: Optional[str]
     status: str
     last_updated: str
