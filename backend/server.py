@@ -6,7 +6,7 @@ import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional
+from typing import List, Optional, Literal
 import uuid
 from datetime import datetime, timezone, timedelta
 import aiohttp
@@ -38,28 +38,76 @@ logger = logging.getLogger(__name__)
 # ============ MODELS ============
 
 class PropertyCreate(BaseModel):
-    url: str
+    url: Optional[str] = None
     nickname: Optional[str] = None
+    address: Optional[str] = None
+    suburb: Optional[str] = None
+    state: Optional[str] = None
+    postcode: Optional[str] = None
+    property_type: Literal["investment", "ppor"] = "investment"
+    current_value: Optional[float] = None
+    # Loan details
+    outstanding_loan: Optional[float] = None
+    monthly_loan_repayment: Optional[float] = None
+    # Rental details
+    rent_amount: Optional[float] = None
+    rent_frequency: Literal["weekly", "monthly"] = "monthly"
+    # Expenses
+    yearly_expenses: Optional[float] = None
+
+class PropertyUpdate(BaseModel):
+    nickname: Optional[str] = None
+    address: Optional[str] = None
+    suburb: Optional[str] = None
+    state: Optional[str] = None
+    postcode: Optional[str] = None
+    property_type: Optional[Literal["investment", "ppor"]] = None
+    current_value: Optional[float] = None
+    outstanding_loan: Optional[float] = None
+    monthly_loan_repayment: Optional[float] = None
+    rent_amount: Optional[float] = None
+    rent_frequency: Optional[Literal["weekly", "monthly"]] = None
+    yearly_expenses: Optional[float] = None
+    bedrooms: Optional[int] = None
+    bathrooms: Optional[int] = None
+    parking: Optional[int] = None
 
 class Property(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    url: str
+    url: Optional[str] = None
     address: str = ""
     nickname: Optional[str] = None
+    property_type: str = "investment"  # "investment" or "ppor"
+    # Value tracking
     current_value: Optional[float] = None
     previous_value: Optional[float] = None
     daily_change: Optional[float] = None
     daily_change_percent: Optional[float] = None
+    # Loan tracking
+    outstanding_loan: Optional[float] = None
+    monthly_loan_repayment: Optional[float] = None
+    # Rental tracking
+    rent_amount: Optional[float] = None
+    rent_frequency: str = "monthly"  # "weekly" or "monthly"
+    monthly_rent: Optional[float] = None  # Normalized to monthly
+    # Expenses
+    yearly_expenses: Optional[float] = None
+    # Calculated fields
+    net_value: Optional[float] = None
+    annual_rental_income: Optional[float] = None
+    annual_loan_repayments: Optional[float] = None
+    yearly_cash_flow: Optional[float] = None
+    yearly_shortage: Optional[float] = None
+    # Property details
     image_url: Optional[str] = None
     bedrooms: Optional[int] = None
     bathrooms: Optional[int] = None
     parking: Optional[int] = None
-    property_type: Optional[str] = None
     suburb: Optional[str] = None
     state: Optional[str] = None
     postcode: Optional[str] = None
-    status: str = "pending"
+    status: str = "active"
     last_updated: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -68,23 +116,36 @@ class PropertyHistory(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     property_id: str
     value: float
+    loan: Optional[float] = None
+    net_value: Optional[float] = None
     recorded_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class PropertyResponse(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str
-    url: str
+    url: Optional[str]
     address: str
     nickname: Optional[str]
+    property_type: str
     current_value: Optional[float]
     previous_value: Optional[float]
     daily_change: Optional[float]
     daily_change_percent: Optional[float]
+    outstanding_loan: Optional[float]
+    monthly_loan_repayment: Optional[float]
+    rent_amount: Optional[float]
+    rent_frequency: str
+    monthly_rent: Optional[float]
+    yearly_expenses: Optional[float]
+    net_value: Optional[float]
+    annual_rental_income: Optional[float]
+    annual_loan_repayments: Optional[float]
+    yearly_cash_flow: Optional[float]
+    yearly_shortage: Optional[float]
     image_url: Optional[str]
     bedrooms: Optional[int]
     bathrooms: Optional[int]
     parking: Optional[int]
-    property_type: Optional[str]
     suburb: Optional[str]
     state: Optional[str]
     postcode: Optional[str]
@@ -97,9 +158,50 @@ class HistoryResponse(BaseModel):
     id: str
     property_id: str
     value: float
+    loan: Optional[float]
+    net_value: Optional[float]
     recorded_at: str
 
-# ============ SCRAPING ============
+# ============ HELPER FUNCTIONS ============
+
+def calculate_property_financials(prop: dict) -> dict:
+    """Calculate all financial metrics for a property"""
+    # Normalize rent to monthly
+    monthly_rent = None
+    if prop.get("rent_amount"):
+        if prop.get("rent_frequency") == "weekly":
+            monthly_rent = prop["rent_amount"] * 52 / 12
+        else:
+            monthly_rent = prop["rent_amount"]
+    
+    # Calculate net value
+    net_value = None
+    if prop.get("current_value") is not None:
+        loan = prop.get("outstanding_loan") or 0
+        net_value = prop["current_value"] - loan
+    
+    # Calculate annual figures
+    annual_rental_income = monthly_rent * 12 if monthly_rent else None
+    annual_loan_repayments = prop.get("monthly_loan_repayment", 0) * 12 if prop.get("monthly_loan_repayment") else None
+    yearly_expenses = prop.get("yearly_expenses") or 0
+    
+    # Calculate cash flow and shortage (only for investment properties)
+    yearly_cash_flow = None
+    yearly_shortage = None
+    
+    if prop.get("property_type") == "investment" and annual_rental_income is not None:
+        total_outgoing = (annual_loan_repayments or 0) + yearly_expenses
+        yearly_cash_flow = annual_rental_income - total_outgoing
+        yearly_shortage = total_outgoing - annual_rental_income  # Positive = shortage, Negative = surplus
+    
+    return {
+        "monthly_rent": monthly_rent,
+        "net_value": net_value,
+        "annual_rental_income": annual_rental_income,
+        "annual_loan_repayments": annual_loan_repayments,
+        "yearly_cash_flow": yearly_cash_flow,
+        "yearly_shortage": yearly_shortage
+    }
 
 def parse_address_from_url(url: str) -> dict:
     """Parse property address from URL patterns"""
@@ -111,7 +213,6 @@ def parse_address_from_url(url: str) -> dict:
     }
     
     # New format: /state/suburb-postcode/street/number-pid-xxxxx/
-    # Example: /nsw/marsden-park-2765/pratia-cres/46-pid-20583686/
     new_format = re.search(r'/([a-z]{2,3})/([a-z-]+)-(\d{4})/([a-z-]+)/(\d+[a-z]?)-pid-', url.lower())
     if new_format:
         state = new_format.group(1).upper()
@@ -133,7 +234,6 @@ def parse_address_from_url(url: str) -> dict:
         address_parts = address_slug.replace('-', ' ').title()
         data["address"] = address_parts
         
-        # Try to extract location from end of URL
         location_match = re.search(r'(\w+)-(\w{2,3})-(\d{4})$', url.rstrip('/'))
         if location_match:
             data["suburb"] = location_match.group(1).title()
@@ -145,155 +245,120 @@ def parse_address_from_url(url: str) -> dict:
 async def scrape_property_data(url: str) -> dict:
     """Scrape property data from property.com.au"""
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-AU,en;q=0.9',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
-        'Sec-Ch-Ua': '"Chromium";v="122", "Google Chrome";v="122"',
-        'Sec-Ch-Ua-Mobile': '?0',
-        'Sec-Ch-Ua-Platform': '"macOS"',
-        'Sec-Fetch-Dest': 'document',
-        'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-Site': 'none',
-        'Sec-Fetch-User': '?1',
-        'Upgrade-Insecure-Requests': '1',
     }
     
-    # First, parse what we can from the URL
     data = {
         "address": "",
         "current_value": None,
         "image_url": None,
-        "bedrooms": None,
-        "bathrooms": None,
-        "parking": None,
-        "property_type": None,
         "suburb": None,
         "state": None,
         "postcode": None
     }
     
-    # Extract address from URL (this always works)
+    # Extract address from URL (always works)
     url_data = parse_address_from_url(url)
     data.update(url_data)
     
-    # Try to scrape additional data
     try:
         async with aiohttp.ClientSession() as session:
-            await asyncio.sleep(1)  # Rate limiting delay
+            await asyncio.sleep(1)
             async with session.get(url, headers=headers, timeout=30) as response:
-                if response.status == 429:
-                    logger.warning(f"Rate limited for {url}")
-                    # Return URL-parsed data instead of error
-                    return data
-                    
                 if response.status != 200:
-                    logger.warning(f"Failed to fetch {url}: Status {response.status}")
-                    return data  # Return URL-parsed data
+                    return data
                 
                 html = await response.text()
                 soup = BeautifulSoup(html, 'html.parser')
                 
-                # Try to extract from meta tags
                 og_title = soup.find('meta', property='og:title')
                 if og_title and og_title.get('content'):
-                    title_content = og_title['content'].split('|')[0].strip()
-                    if title_content:
-                        data["address"] = title_content
+                    title = og_title['content'].split('|')[0].strip()
+                    if title:
+                        data["address"] = title
                 
-                # Try to extract image
                 og_image = soup.find('meta', property='og:image')
                 if og_image and og_image.get('content'):
                     data["image_url"] = og_image['content']
                 
-                # Try to find property value estimate
-                value_patterns = [
-                    r'\$[\d,]+(?:\.\d{2})?',
-                    r'[\d,]+(?:\.\d{2})?\s*(?:million|m)',
-                ]
-                
-                for script in soup.find_all('script'):
-                    text = script.string or ""
-                    for pattern in value_patterns:
-                        match = re.search(pattern, text, re.IGNORECASE)
-                        if match:
-                            value_str = match.group()
-                            value = parse_property_value(value_str)
-                            if value and value > 100000:
-                                data["current_value"] = value
-                                break
-                
                 return data
                 
-    except asyncio.TimeoutError:
-        logger.error(f"Timeout scraping {url}")
-        return data  # Return URL-parsed data even on timeout
     except Exception as e:
         logger.error(f"Error scraping {url}: {str(e)}")
-        return data  # Return URL-parsed data even on error
-
-def parse_property_value(value_str: str) -> Optional[float]:
-    """Parse property value string to float"""
-    if not value_str:
-        return None
-    
-    # Remove $ and commas
-    clean = re.sub(r'[$,\s]', '', value_str.lower())
-    
-    # Handle millions
-    if 'm' in clean or 'million' in clean:
-        clean = re.sub(r'[a-zA-Z]', '', clean)
-        try:
-            return float(clean) * 1000000
-        except ValueError:
-            return None
-    
-    try:
-        return float(clean)
-    except ValueError:
-        return None
+        return data
 
 # ============ API ROUTES ============
 
 @api_router.get("/")
 async def root():
-    return {"message": "Property Value Tracker API"}
+    return {"message": "Property Management API"}
 
-@api_router.post("/properties", response_model=PropertyResponse, status_code=201)
+@api_router.post("/properties", response_model=PropertyResponse)
 async def create_property(input: PropertyCreate):
-    """Add a new property to track"""
-    # Validate URL
-    if not input.url.startswith('http'):
-        raise HTTPException(status_code=400, detail="Invalid URL format")
+    """Add a new property (via URL or manual entry)"""
     
-    # Check if property already exists
-    existing = await db.properties.find_one({"url": input.url}, {"_id": 0})
-    if existing:
-        raise HTTPException(status_code=400, detail="Property already being tracked")
+    # Start with input data
+    property_data = {
+        "id": str(uuid.uuid4()),
+        "url": input.url,
+        "nickname": input.nickname,
+        "address": input.address or "",
+        "suburb": input.suburb,
+        "state": input.state,
+        "postcode": input.postcode,
+        "property_type": input.property_type,
+        "current_value": input.current_value,
+        "outstanding_loan": input.outstanding_loan,
+        "monthly_loan_repayment": input.monthly_loan_repayment,
+        "rent_amount": input.rent_amount,
+        "rent_frequency": input.rent_frequency,
+        "yearly_expenses": input.yearly_expenses,
+        "status": "active",
+        "last_updated": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
     
-    # Create property record
-    property_obj = Property(
-        url=input.url,
-        nickname=input.nickname,
-        status="pending"
-    )
+    # If URL provided, try to parse address from it
+    if input.url:
+        url_data = parse_address_from_url(input.url)
+        if url_data.get("address") and not input.address:
+            property_data["address"] = url_data["address"]
+        if url_data.get("suburb") and not input.suburb:
+            property_data["suburb"] = url_data["suburb"]
+        if url_data.get("state") and not input.state:
+            property_data["state"] = url_data["state"]
+        if url_data.get("postcode") and not input.postcode:
+            property_data["postcode"] = url_data["postcode"]
     
-    doc = property_obj.model_dump()
-    doc['last_updated'] = doc['last_updated'].isoformat()
-    doc['created_at'] = doc['created_at'].isoformat()
+    # Calculate financials
+    financials = calculate_property_financials(property_data)
+    property_data.update(financials)
     
-    await db.properties.insert_one(doc)
+    await db.properties.insert_one(property_data)
     
-    # Trigger initial scrape in background
-    asyncio.create_task(update_single_property(property_obj.id))
+    # Record initial history if value provided
+    if input.current_value:
+        history = {
+            "id": str(uuid.uuid4()),
+            "property_id": property_data["id"],
+            "value": input.current_value,
+            "loan": input.outstanding_loan,
+            "net_value": financials.get("net_value"),
+            "recorded_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.property_history.insert_one(history)
     
-    return PropertyResponse(**doc)
+    return PropertyResponse(**property_data)
 
 @api_router.get("/properties", response_model=List[PropertyResponse])
-async def get_properties(search: Optional[str] = None, suburb: Optional[str] = None):
-    """Get all tracked properties with optional filters"""
+async def get_properties(
+    search: Optional[str] = None, 
+    suburb: Optional[str] = None,
+    property_type: Optional[str] = None
+):
+    """Get all properties with optional filters"""
     query = {}
     
     if search:
@@ -303,8 +368,11 @@ async def get_properties(search: Optional[str] = None, suburb: Optional[str] = N
             {"suburb": {"$regex": search, "$options": "i"}}
         ]
     
-    if suburb:
+    if suburb and suburb != "all":
         query["suburb"] = {"$regex": suburb, "$options": "i"}
+    
+    if property_type and property_type != "all":
+        query["property_type"] = property_type
     
     properties = await db.properties.find(query, {"_id": 0}).sort("created_at", -1).to_list(100)
     return [PropertyResponse(**p) for p in properties]
@@ -317,22 +385,61 @@ async def get_property(property_id: str):
         raise HTTPException(status_code=404, detail="Property not found")
     return PropertyResponse(**property)
 
+@api_router.patch("/properties/{property_id}", response_model=PropertyResponse)
+async def update_property(property_id: str, input: PropertyUpdate):
+    """Update a property's details"""
+    property = await db.properties.find_one({"id": property_id}, {"_id": 0})
+    if not property:
+        raise HTTPException(status_code=404, detail="Property not found")
+    
+    update_data = {k: v for k, v in input.model_dump().items() if v is not None}
+    update_data["last_updated"] = datetime.now(timezone.utc).isoformat()
+    
+    # Track value changes for history
+    old_value = property.get("current_value")
+    new_value = update_data.get("current_value")
+    
+    if new_value and new_value != old_value:
+        update_data["previous_value"] = old_value
+        if old_value and old_value > 0:
+            update_data["daily_change"] = new_value - old_value
+            update_data["daily_change_percent"] = round(((new_value - old_value) / old_value) * 100, 2)
+    
+    # Merge with existing data for calculations
+    merged = {**property, **update_data}
+    financials = calculate_property_financials(merged)
+    update_data.update(financials)
+    
+    await db.properties.update_one({"id": property_id}, {"$set": update_data})
+    
+    # Record history if value changed
+    if new_value and new_value != old_value:
+        history = {
+            "id": str(uuid.uuid4()),
+            "property_id": property_id,
+            "value": new_value,
+            "loan": update_data.get("outstanding_loan") or property.get("outstanding_loan"),
+            "net_value": financials.get("net_value"),
+            "recorded_at": datetime.now(timezone.utc).isoformat()
+        }
+        await db.property_history.insert_one(history)
+    
+    updated = await db.properties.find_one({"id": property_id}, {"_id": 0})
+    return PropertyResponse(**updated)
+
 @api_router.delete("/properties/{property_id}")
 async def delete_property(property_id: str):
-    """Remove a property from tracking"""
+    """Remove a property"""
     result = await db.properties.delete_one({"id": property_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Property not found")
     
-    # Also delete history
     await db.property_history.delete_many({"property_id": property_id})
-    
     return {"message": "Property deleted successfully"}
 
 @api_router.get("/properties/{property_id}/history", response_model=List[HistoryResponse])
 async def get_property_history(property_id: str, days: int = 30):
     """Get historical values for a property"""
-    # Verify property exists
     property = await db.properties.find_one({"id": property_id}, {"_id": 0})
     if not property:
         raise HTTPException(status_code=404, detail="Property not found")
@@ -346,152 +453,86 @@ async def get_property_history(property_id: str, days: int = 30):
     
     return [HistoryResponse(**h) for h in history]
 
-@api_router.post("/properties/{property_id}/refresh")
-async def refresh_property(property_id: str):
-    """Manually trigger a refresh for a property"""
-    property = await db.properties.find_one({"id": property_id}, {"_id": 0})
-    if not property:
-        raise HTTPException(status_code=404, detail="Property not found")
+@api_router.get("/portfolio/stats")
+async def get_portfolio_stats():
+    """Get aggregated portfolio statistics (Investment properties only)"""
+    # Only include investment properties
+    query = {"property_type": "investment"}
     
-    await update_single_property(property_id)
+    properties = await db.properties.find(query, {"_id": 0}).to_list(1000)
     
-    updated = await db.properties.find_one({"id": property_id}, {"_id": 0})
-    return PropertyResponse(**updated)
-
-class PropertyValueUpdate(BaseModel):
-    current_value: float
-
-@api_router.patch("/properties/{property_id}/value")
-async def update_property_value(property_id: str, input: PropertyValueUpdate):
-    """Manually update a property's value"""
-    property = await db.properties.find_one({"id": property_id}, {"_id": 0})
-    if not property:
-        raise HTTPException(status_code=404, detail="Property not found")
+    total_value = sum(p.get("current_value") or 0 for p in properties)
+    total_loans = sum(p.get("outstanding_loan") or 0 for p in properties)
+    total_net_value = sum(p.get("net_value") or 0 for p in properties)
+    total_annual_rent = sum(p.get("annual_rental_income") or 0 for p in properties)
+    total_annual_expenses = sum(p.get("yearly_expenses") or 0 for p in properties)
+    total_annual_repayments = sum(p.get("annual_loan_repayments") or 0 for p in properties)
     
-    old_value = property.get("current_value")
-    new_value = input.current_value
+    # Calculate overall shortage/surplus
+    total_outgoing = total_annual_repayments + total_annual_expenses
+    overall_cash_flow = total_annual_rent - total_outgoing
+    overall_shortage = total_outgoing - total_annual_rent
     
-    update_data = {
-        "current_value": new_value,
-        "previous_value": old_value,
-        "status": "active",
-        "last_updated": datetime.now(timezone.utc).isoformat()
-    }
-    
-    if old_value and old_value > 0:
-        update_data["daily_change"] = new_value - old_value
-        update_data["daily_change_percent"] = round(((new_value - old_value) / old_value) * 100, 2)
-    
-    await db.properties.update_one({"id": property_id}, {"$set": update_data})
-    
-    # Record history
-    history = PropertyHistory(
-        property_id=property_id,
-        value=new_value
-    )
-    history_doc = history.model_dump()
-    history_doc['recorded_at'] = history_doc['recorded_at'].isoformat()
-    await db.property_history.insert_one(history_doc)
-    
-    updated = await db.properties.find_one({"id": property_id}, {"_id": 0})
-    return PropertyResponse(**updated)
-
-@api_router.get("/stats")
-async def get_stats():
-    """Get dashboard statistics"""
-    total = await db.properties.count_documents({})
-    active = await db.properties.count_documents({"status": "active"})
-    pending = await db.properties.count_documents({"status": "pending"})
-    error = await db.properties.count_documents({"status": "error"})
-    
-    # Get total value of all properties
-    pipeline = [
-        {"$match": {"current_value": {"$ne": None}}},
-        {"$group": {"_id": None, "total": {"$sum": "$current_value"}}}
-    ]
-    result = await db.properties.aggregate(pipeline).to_list(1)
-    total_value = result[0]["total"] if result else 0
-    
-    # Get average change
-    pipeline = [
-        {"$match": {"daily_change_percent": {"$ne": None}}},
-        {"$group": {"_id": None, "avg": {"$avg": "$daily_change_percent"}}}
-    ]
-    result = await db.properties.aggregate(pipeline).to_list(1)
-    avg_change = result[0]["avg"] if result else 0
+    # Count by type
+    total_investment = len(properties)
+    total_ppor = await db.properties.count_documents({"property_type": "ppor"})
     
     return {
-        "total_properties": total,
-        "active": active,
-        "pending": pending,
-        "error": error,
-        "total_value": total_value,
-        "average_daily_change": round(avg_change, 2) if avg_change else 0
+        "total_properties": total_investment + total_ppor,
+        "investment_count": total_investment,
+        "ppor_count": total_ppor,
+        "total_property_value": total_value,
+        "total_outstanding_loans": total_loans,
+        "total_net_value": total_net_value,
+        "total_annual_rental_income": total_annual_rent,
+        "total_annual_expenses": total_annual_expenses,
+        "total_annual_loan_repayments": total_annual_repayments,
+        "overall_yearly_cash_flow": overall_cash_flow,
+        "overall_yearly_shortage": overall_shortage,
+        "is_cash_flow_positive": overall_cash_flow >= 0
     }
 
-# ============ BACKGROUND TASKS ============
-
-async def update_single_property(property_id: str):
-    """Update a single property's data"""
-    property = await db.properties.find_one({"id": property_id}, {"_id": 0})
-    if not property:
-        return
+@api_router.get("/portfolio/history")
+async def get_portfolio_history(days: int = 90):
+    """Get historical portfolio values for charting"""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
     
-    logger.info(f"Updating property: {property['url']}")
+    # Get all investment property IDs
+    investment_props = await db.properties.find(
+        {"property_type": "investment"}, 
+        {"id": 1, "_id": 0}
+    ).to_list(1000)
+    prop_ids = [p["id"] for p in investment_props]
     
-    scraped_data = await scrape_property_data(property['url'])
+    if not prop_ids:
+        return []
     
-    update_data = {
-        "status": "active",
-        "last_updated": datetime.now(timezone.utc).isoformat()
-    }
+    # Aggregate history by date
+    pipeline = [
+        {"$match": {
+            "property_id": {"$in": prop_ids},
+            "recorded_at": {"$gte": cutoff.isoformat()}
+        }},
+        {"$addFields": {
+            "date": {"$substr": ["$recorded_at", 0, 10]}
+        }},
+        {"$group": {
+            "_id": "$date",
+            "total_value": {"$sum": "$value"},
+            "total_loan": {"$sum": {"$ifNull": ["$loan", 0]}},
+            "total_net": {"$sum": {"$ifNull": ["$net_value", 0]}}
+        }},
+        {"$sort": {"_id": 1}}
+    ]
     
-    # Always update address and location if we got them from URL parsing
-    if scraped_data.get("address"):
-        update_data["address"] = scraped_data["address"]
-    if scraped_data.get("image_url"):
-        update_data["image_url"] = scraped_data["image_url"]
-    if scraped_data.get("suburb"):
-        update_data["suburb"] = scraped_data["suburb"]
-    if scraped_data.get("state"):
-        update_data["state"] = scraped_data["state"]
-    if scraped_data.get("postcode"):
-        update_data["postcode"] = scraped_data["postcode"]
+    result = await db.property_history.aggregate(pipeline).to_list(1000)
     
-    # Handle value updates
-    new_value = scraped_data.get("current_value")
-    if new_value:
-        old_value = property.get("current_value")
-        update_data["previous_value"] = old_value
-        update_data["current_value"] = new_value
-        
-        if old_value and old_value > 0:
-            update_data["daily_change"] = new_value - old_value
-            update_data["daily_change_percent"] = round(((new_value - old_value) / old_value) * 100, 2)
-        
-        # Record history
-        history = PropertyHistory(
-            property_id=property_id,
-            value=new_value
-        )
-        history_doc = history.model_dump()
-        history_doc['recorded_at'] = history_doc['recorded_at'].isoformat()
-        await db.property_history.insert_one(history_doc)
-    
-    await db.properties.update_one({"id": property_id}, {"$set": update_data})
-
-async def update_all_properties():
-    """Update all properties - called by scheduler"""
-    logger.info("Starting daily property update...")
-    properties = await db.properties.find({}, {"_id": 0, "id": 1}).to_list(1000)
-    
-    for prop in properties:
-        await update_single_property(prop["id"])
-        await asyncio.sleep(2)  # Rate limiting
-    
-    logger.info("Daily property update complete")
-
-# ============ DEMO DATA ============
+    return [{
+        "date": r["_id"],
+        "total_value": r["total_value"],
+        "total_loan": r["total_loan"],
+        "total_net": r["total_net"]
+    } for r in result]
 
 @api_router.post("/demo/seed")
 async def seed_demo_data():
@@ -499,91 +540,135 @@ async def seed_demo_data():
     demo_properties = [
         {
             "id": str(uuid.uuid4()),
-            "url": "https://www.property.com.au/property/123-george-street-sydney-nsw-2000/",
+            "url": "https://www.property.com.au/nsw/sydney-2000/george-st/123-pid-11111111/",
             "address": "123 George Street, Sydney NSW 2000",
-            "nickname": "Sydney CBD Unit",
+            "nickname": "Sydney CBD Investment",
+            "property_type": "investment",
             "current_value": 1250000,
             "previous_value": 1240000,
             "daily_change": 10000,
             "daily_change_percent": 0.81,
+            "outstanding_loan": 800000,
+            "monthly_loan_repayment": 4500,
+            "rent_amount": 850,
+            "rent_frequency": "weekly",
+            "yearly_expenses": 12000,
             "image_url": "https://images.unsplash.com/photo-1758548157747-285c7012db5b?crop=entropy&cs=srgb&fm=jpg&q=85",
             "bedrooms": 2,
             "bathrooms": 2,
             "parking": 1,
-            "property_type": "Apartment",
             "suburb": "Sydney",
             "state": "NSW",
             "postcode": "2000",
             "status": "active",
-            "last_updated": datetime.now(timezone.utc).isoformat(),
-            "created_at": datetime.now(timezone.utc).isoformat()
         },
         {
             "id": str(uuid.uuid4()),
-            "url": "https://www.property.com.au/property/45-chapel-street-melbourne-vic-3141/",
+            "url": "https://www.property.com.au/vic/south-yarra-3141/chapel-st/45-pid-22222222/",
             "address": "45 Chapel Street, South Yarra VIC 3141",
-            "nickname": "Melbourne Investment",
+            "nickname": "Melbourne Rental",
+            "property_type": "investment",
             "current_value": 980000,
             "previous_value": 985000,
             "daily_change": -5000,
             "daily_change_percent": -0.51,
+            "outstanding_loan": 650000,
+            "monthly_loan_repayment": 3800,
+            "rent_amount": 2800,
+            "rent_frequency": "monthly",
+            "yearly_expenses": 9500,
             "image_url": "https://images.unsplash.com/photo-1757439402190-99b73ac8e807?crop=entropy&cs=srgb&fm=jpg&q=85",
             "bedrooms": 3,
             "bathrooms": 1,
             "parking": 2,
-            "property_type": "Townhouse",
             "suburb": "South Yarra",
             "state": "VIC",
             "postcode": "3141",
             "status": "active",
-            "last_updated": datetime.now(timezone.utc).isoformat(),
-            "created_at": datetime.now(timezone.utc).isoformat()
         },
         {
             "id": str(uuid.uuid4()),
-            "url": "https://www.property.com.au/property/78-james-street-brisbane-qld-4000/",
+            "url": "https://www.property.com.au/qld/fortitude-valley-4006/james-st/78-pid-33333333/",
             "address": "78 James Street, Fortitude Valley QLD 4006",
-            "nickname": "Brisbane Rental",
+            "nickname": "Brisbane Unit",
+            "property_type": "investment",
             "current_value": 720000,
             "previous_value": 715000,
             "daily_change": 5000,
             "daily_change_percent": 0.70,
+            "outstanding_loan": 500000,
+            "monthly_loan_repayment": 2900,
+            "rent_amount": 550,
+            "rent_frequency": "weekly",
+            "yearly_expenses": 7500,
             "image_url": "https://images.unsplash.com/photo-1758548157275-d939cf0f0e32?crop=entropy&cs=srgb&fm=jpg&q=85",
             "bedrooms": 2,
             "bathrooms": 1,
             "parking": 1,
-            "property_type": "Apartment",
             "suburb": "Fortitude Valley",
             "state": "QLD",
             "postcode": "4006",
             "status": "active",
-            "last_updated": datetime.now(timezone.utc).isoformat(),
-            "created_at": datetime.now(timezone.utc).isoformat()
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "url": None,
+            "address": "15 Beach Road, Bondi NSW 2026",
+            "nickname": "Our Family Home",
+            "property_type": "ppor",
+            "current_value": 2100000,
+            "previous_value": 2080000,
+            "daily_change": 20000,
+            "daily_change_percent": 0.96,
+            "outstanding_loan": 1200000,
+            "monthly_loan_repayment": 6500,
+            "rent_amount": None,
+            "rent_frequency": "monthly",
+            "yearly_expenses": 15000,
+            "image_url": "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?crop=entropy&cs=srgb&fm=jpg&q=85",
+            "bedrooms": 4,
+            "bathrooms": 3,
+            "parking": 2,
+            "suburb": "Bondi",
+            "state": "NSW",
+            "postcode": "2026",
+            "status": "active",
         }
     ]
     
-    # Clear existing demo data
+    # Clear existing data
     await db.properties.delete_many({})
     await db.property_history.delete_many({})
     
-    # Insert properties
+    # Insert properties with calculated financials
     for prop in demo_properties:
+        prop["last_updated"] = datetime.now(timezone.utc).isoformat()
+        prop["created_at"] = datetime.now(timezone.utc).isoformat()
+        
+        financials = calculate_property_financials(prop)
+        prop.update(financials)
+        
         await db.properties.insert_one(prop)
         
         # Generate historical data (30 days)
-        base_value = prop["current_value"]
-        for i in range(30, 0, -1):
-            # Add some variance
-            variance = (hash(f"{prop['id']}{i}") % 100 - 50) * 100  # +/- $5000
-            value = base_value + variance + (i * 200)  # Trending up slightly
+        if prop["current_value"]:
+            base_value = prop["current_value"]
+            base_loan = prop.get("outstanding_loan") or 0
             
-            history = {
-                "id": str(uuid.uuid4()),
-                "property_id": prop["id"],
-                "value": value,
-                "recorded_at": (datetime.now(timezone.utc) - timedelta(days=i)).isoformat()
-            }
-            await db.property_history.insert_one(history)
+            for i in range(30, 0, -1):
+                variance = (hash(f"{prop['id']}{i}") % 100 - 50) * 100
+                value = base_value + variance + (i * 200)
+                loan = base_loan - (i * 50)  # Loan slowly decreases
+                
+                history = {
+                    "id": str(uuid.uuid4()),
+                    "property_id": prop["id"],
+                    "value": value,
+                    "loan": loan,
+                    "net_value": value - loan,
+                    "recorded_at": (datetime.now(timezone.utc) - timedelta(days=i)).isoformat()
+                }
+                await db.property_history.insert_one(history)
     
     return {"message": f"Seeded {len(demo_properties)} demo properties with history"}
 
