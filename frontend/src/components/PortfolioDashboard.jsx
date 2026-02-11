@@ -238,9 +238,12 @@ export const PortfolioDashboard = () => {
             </div>
           </div>
 
-          {/* Cash Flow Summary */}
+          {/* Cash Flow Summary - Investment Properties Only */}
           <div className="mb-8">
-            <h2 className="text-xl font-serif font-semibold mb-4">Annual Cash Flow Summary</h2>
+            <h2 className="text-xl font-serif font-semibold mb-4">
+              Annual Cash Flow Summary
+              <span className="text-xs font-normal text-muted-foreground ml-2">(Investment Properties Only)</span>
+            </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               <Card className="p-4">
                 <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Rental Income</p>
