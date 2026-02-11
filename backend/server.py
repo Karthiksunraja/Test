@@ -441,18 +441,12 @@ async def update_single_property(property_id: str):
     
     scraped_data = await scrape_property_data(property['url'])
     
-    if "error" in scraped_data:
-        await db.properties.update_one(
-            {"id": property_id},
-            {"$set": {"status": "error", "last_updated": datetime.now(timezone.utc).isoformat()}}
-        )
-        return
-    
     update_data = {
         "status": "active",
         "last_updated": datetime.now(timezone.utc).isoformat()
     }
     
+    # Always update address and location if we got them from URL parsing
     if scraped_data.get("address"):
         update_data["address"] = scraped_data["address"]
     if scraped_data.get("image_url"):
