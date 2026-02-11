@@ -455,35 +455,41 @@ async def get_property_history(property_id: str, days: int = 30):
 
 @api_router.get("/portfolio/stats")
 async def get_portfolio_stats():
-    """Get aggregated portfolio statistics (Investment properties only)"""
-    # Only include investment properties
-    query = {"property_type": "investment"}
+    """Get aggregated portfolio statistics
+    - Value/Loans/Net: Include ALL properties (Investment + PPOR)
+    - Rental/Expenses/Cash Flow: Investment properties ONLY
+    """
+    # Get ALL properties for value calculations
+    all_properties = await db.properties.find({}, {"_id": 0}).to_list(1000)
     
-    properties = await db.properties.find(query, {"_id": 0}).to_list(1000)
+    # Separate by type
+    investment_properties = [p for p in all_properties if p.get("property_type") == "investment"]
+    ppor_properties = [p for p in all_properties if p.get("property_type") == "ppor"]
     
-    total_value = sum(p.get("current_value") or 0 for p in properties)
-    total_loans = sum(p.get("outstanding_loan") or 0 for p in properties)
-    total_net_value = sum(p.get("net_value") or 0 for p in properties)
-    total_annual_rent = sum(p.get("annual_rental_income") or 0 for p in properties)
-    total_annual_expenses = sum(p.get("yearly_expenses") or 0 for p in properties)
-    total_annual_repayments = sum(p.get("annual_loan_repayments") or 0 for p in properties)
+    # VALUE/LOANS/NET - Include ALL properties
+    total_value = sum(p.get("current_value") or 0 for p in all_properties)
+    total_loans = sum(p.get("outstanding_loan") or 0 for p in all_properties)
+    total_net_value = sum(p.get("net_value") or 0 for p in all_properties)
     
-    # Calculate overall shortage/surplus
+    # RENTAL/EXPENSES/CASH FLOW - Investment properties ONLY
+    total_annual_rent = sum(p.get("annual_rental_income") or 0 for p in investment_properties)
+    total_annual_expenses = sum(p.get("yearly_expenses") or 0 for p in investment_properties)
+    total_annual_repayments = sum(p.get("annual_loan_repayments") or 0 for p in investment_properties)
+    
+    # Calculate overall shortage/surplus (Investment only)
     total_outgoing = total_annual_repayments + total_annual_expenses
     overall_cash_flow = total_annual_rent - total_outgoing
     overall_shortage = total_outgoing - total_annual_rent
     
-    # Count by type
-    total_investment = len(properties)
-    total_ppor = await db.properties.count_documents({"property_type": "ppor"})
-    
     return {
-        "total_properties": total_investment + total_ppor,
-        "investment_count": total_investment,
-        "ppor_count": total_ppor,
+        "total_properties": len(all_properties),
+        "investment_count": len(investment_properties),
+        "ppor_count": len(ppor_properties),
+        # All properties
         "total_property_value": total_value,
         "total_outstanding_loans": total_loans,
         "total_net_value": total_net_value,
+        # Investment only
         "total_annual_rental_income": total_annual_rent,
         "total_annual_expenses": total_annual_expenses,
         "total_annual_loan_repayments": total_annual_repayments,
