@@ -494,9 +494,41 @@ const PropertyCard = ({ property, onDelete, onRefresh, onUpdateValue, formatCurr
         </div>
 
         <div className="mb-4">
-          <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">Current Value</p>
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground">Current Value</p>
+            <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" data-testid={`edit-value-${property.id}`}>
+                  <Edit className="w-3 h-3 mr-1" />
+                  Edit
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle className="font-serif">Update Property Value</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 pt-4">
+                  <p className="text-sm text-muted-foreground">
+                    Enter the current estimated value for:<br />
+                    <span className="font-medium text-foreground">{property.address || property.nickname}</span>
+                  </p>
+                  <Input
+                    placeholder="e.g., 750000"
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    data-testid="value-input"
+                  />
+                  <Button onClick={handleSaveValue} className="w-full btn-primary" data-testid="save-value-btn">
+                    Save Value
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
           <p className="font-serif text-3xl font-normal" data-testid={`property-value-${property.id}`}>
-            {formatCurrency(property.current_value)}
+            {property.current_value ? formatCurrency(property.current_value) : (
+              <span className="text-muted-foreground text-xl">Click Edit to add</span>
+            )}
           </p>
         </div>
 
