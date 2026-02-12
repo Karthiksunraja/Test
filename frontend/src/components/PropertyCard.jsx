@@ -251,6 +251,15 @@ export const PropertyCard = ({ property, onUpdate, style }) => {
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div>
+              <Label className="text-xs uppercase tracking-wider">Nickname</Label>
+              <Input
+                value={editData.nickname}
+                onChange={(e) => setEditData({ ...editData, nickname: e.target.value })}
+                placeholder="e.g., Beach House, City Unit"
+                data-testid="edit-nickname-input"
+              />
+            </div>
+            <div>
               <Label className="text-xs uppercase tracking-wider">Property Value ($)</Label>
               <Input
                 type="number"
