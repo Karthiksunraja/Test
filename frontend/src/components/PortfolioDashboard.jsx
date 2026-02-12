@@ -263,7 +263,23 @@ export const PortfolioDashboard = () => {
                   {formatCurrency(stats?.total_annual_expenses)}
                 </p>
               </Card>
-              <Card className="p-4 col-span-1 sm:col-span-2">
+              <Card className="p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  {stats?.is_cash_flow_positive ? (
+                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 text-red-500" />
+                  )}
+                  <p className="text-xs uppercase tracking-widest text-muted-foreground">
+                    Monthly {stats?.is_cash_flow_positive ? "Surplus" : "Shortage"}
+                  </p>
+                </div>
+                <p className={`font-serif text-xl ${stats?.is_cash_flow_positive ? 'text-emerald-600' : 'text-red-500'}`} data-testid="stat-monthly-cashflow">
+                  {formatCurrency(Math.abs((stats?.overall_yearly_shortage || 0) / 12))}
+                  <span className="text-xs font-sans ml-1">/month</span>
+                </p>
+              </Card>
+              <Card className="p-4">
                 <div className="flex items-center gap-2 mb-1">
                   {stats?.is_cash_flow_positive ? (
                     <CheckCircle className="w-4 h-4 text-emerald-600" />
@@ -274,11 +290,9 @@ export const PortfolioDashboard = () => {
                     Yearly {stats?.is_cash_flow_positive ? "Surplus" : "Shortage"}
                   </p>
                 </div>
-                <p className={`font-serif text-2xl ${stats?.is_cash_flow_positive ? 'text-emerald-600' : 'text-red-500'}`} data-testid="stat-cashflow">
+                <p className={`font-serif text-xl ${stats?.is_cash_flow_positive ? 'text-emerald-600' : 'text-red-500'}`} data-testid="stat-cashflow">
                   {formatCurrency(Math.abs(stats?.overall_yearly_shortage || 0))}
-                  <span className="text-sm font-sans ml-2">
-                    {stats?.is_cash_flow_positive ? "surplus" : "shortage"}
-                  </span>
+                  <span className="text-xs font-sans ml-1">/year</span>
                 </p>
               </Card>
             </div>
