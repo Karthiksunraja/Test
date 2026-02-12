@@ -93,6 +93,7 @@ export const PropertyCard = ({ property, onUpdate, style }) => {
   const handleSave = async () => {
     try {
       const updatePayload = {};
+      if (editData.nickname !== property.nickname) updatePayload.nickname = editData.nickname || null;
       if (editData.current_value) updatePayload.current_value = parseFloat(editData.current_value);
       if (editData.outstanding_loan) updatePayload.outstanding_loan = parseFloat(editData.outstanding_loan);
       if (editData.monthly_loan_repayment) updatePayload.monthly_loan_repayment = parseFloat(editData.monthly_loan_repayment);
