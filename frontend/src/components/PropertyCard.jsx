@@ -45,6 +45,7 @@ import { API } from "@/App";
 export const PropertyCard = ({ property, onUpdate, style }) => {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editData, setEditData] = useState({
+    nickname: property.nickname || "",
     current_value: property.current_value || "",
     outstanding_loan: property.outstanding_loan || "",
     monthly_loan_repayment: property.monthly_loan_repayment || "",
